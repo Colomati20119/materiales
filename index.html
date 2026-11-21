@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Práctica — Materiales Metálicos</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e1da;
+    --acc:#2f5d8a; --ok:#2e7d4f; --ok-bg:#e7f4ec; --bad:#b3372e; --bad-bg:#fbeae8;
+    --warn:#9a6a00; --warn-bg:#fff5da;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17181a; --card:#212226; --ink:#ececea; --muted:#9a9a95; --line:#34353a;
+      --acc:#7fb0e0; --ok:#6fcf97; --ok-bg:#1d3427; --bad:#f08a80; --bad-bg:#3a2220;
+      --warn:#e6b84d; --warn-bg:#3a3020; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:36px 16px;text-align:center;cursor:pointer;color:var(--muted)}
+  .drop.over{border-color:var(--acc);color:var(--acc)}
+  .drop b{color:var(--ink)}
+  button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 16px;cursor:pointer}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  button:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .temas label,.opts label{display:flex;gap:8px;align-items:center;padding:4px 0;cursor:pointer}
+  .temas .n{color:var(--muted);font-size:13px;margin-left:auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px}
+  @media (max-width:600px){.grid2{grid-template-columns:1fr}}
+  h2{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .top{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted);margin-bottom:8px}
+  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:16px}
+  .bar div{height:100%;background:var(--acc);width:0;transition:width .25s}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--muted);margin-right:6px}
+  .tag.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+  .q{font-size:18px;margin:12px 0 6px;font-weight:500}
+  .hint{font-size:13px;color:var(--muted);margin-bottom:12px}
+  .img{margin:10px 0}
+  .img img{max-width:100%;border-radius:8px;border:1px solid var(--line);background:#fff}
+  .img a{font-size:13px;color:var(--acc)}
+  .opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin:8px 0;cursor:pointer;transition:background .15s,border-color .15s}
+  .opt:hover{border-color:var(--acc)}
+  .opt input{margin-top:4px;accent-color:var(--acc)}
+  .opt .k{font-weight:600;color:var(--muted);min-width:18px}
+  .opt .mark{margin-left:auto;font-weight:700}
+  .opt.ok{background:var(--ok-bg);border-color:var(--ok);box-shadow:inset 0 0 0 1px var(--ok)}
+  .opt.ok .mark{color:var(--ok)}
+  .opt.bad{background:var(--bad-bg);border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+  .opt.bad .mark{color:var(--bad)}
+  .opt.miss{border-color:var(--ok);border-style:dashed}
+  .opt.miss .mark{color:var(--ok)}
+  .opt.unk .mark{color:var(--muted)}
+  .locked .opt{cursor:default}
+  .verdict{margin-top:14px;padding:12px 14px;border-radius:10px;font-weight:600}
+  .verdict.ok{background:var(--ok-bg);color:var(--ok)}
+  .verdict.bad{background:var(--bad-bg);color:var(--bad)}
+  .verdict.unk{background:var(--warn-bg);color:var(--warn)}
+  .extra{font-weight:400;font-size:14px;color:var(--ink);margin-top:6px}
+  .actions{display:flex;gap:10px;justify-content:space-between;margin-top:16px;flex-wrap:wrap}
+  .score{font-size:42px;font-weight:700;margin:6px 0}
+  .lista{margin:10px 0 0;padding-left:18px}
+  .lista li{margin:6px 0}
+  .muted{color:var(--muted)}
+  .kbd{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+  .hidden{display:none}
+  .err{color:var(--bad);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Práctica — Materiales Metálicos</h1>
+  <p class="sub">Cargá tu <code>banco.json</code> y respondé. Te dice al instante si está bien.</p>
+
+  <!-- 1. Cargar -->
+  <section id="vCarga">
+    <div class="card">
+      <div class="drop" id="drop">
+        <b>Arrastrá acá el banco.json</b><br>o hacé clic para elegirlo
+        <input type="file" id="file" accept=".json,application/json" hidden>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+  </section>
+
+  <!-- 2. Configurar -->
+  <section id="vConfig" class="hidden">
+    <div class="card">
+      <h2>Unidades</h2>
+      <div class="temas" id="temas"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="todos">Todas</button><button id="ninguno">Ninguna</button>
+      </div>
+    </div>
+    <div class="card opts">
+      <h2>Opciones</h2>
+      <div class="grid2">
+        <label><input type="checkbox" id="oMezclarQ" checked> Mezclar preguntas</label>
+        <label><input type="checkbox" id="oMezclarO" checked> Mezclar opciones</label>
+        <label><input type="checkbox" id="oSinConf"> Incluir las no confirmadas</label>
+        <label><input type="checkbox" id="oFalladas"> Solo las que más fallo</label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label>Cantidad: <select id="oCant">
+          <option value="10">10</option><option value="20">20</option><option value="30">30</option>
+          <option value="0" selected>Todas</option></select></label>
+      </div>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <span class="muted" id="resumenSel"></span>
+      <div class="row"><button id="otroJson">Cargar otro json</button>
+      <button class="primary" id="empezar">Empezar</button></div>
+    </div>
+  </section>
+
+  <!-- 3. Pregunta -->
+  <section id="vPregunta" class="hidden">
+    <div class="top"><span id="pos"></span><span id="marcador"></span></div>
+    <div class="bar"><div id="barra"></div></div>
+    <div class="card" id="qCard">
+      <div id="tags"></div>
+      <div class="q" id="enunciado"></div>
+      <div class="hint" id="consigna"></div>
+      <div id="imgs"></div>
+      <div id="opciones"></div>
+      <div id="veredicto"></div>
+      <div class="actions">
+        <button id="salir">Terminar</button>
+        <div class="row"><button id="saltar">Saltar</button>
+        <button class="primary" id="accion" disabled>Comprobar</button></div>
+      </div>
+    </div>
+    <div class="kbd">Teclas: 1–9 elegir · Enter comprobar / siguiente</div>
+  </section>
+
+  <!-- 4. Resultado -->
+  <section id="vFin" class="hidden">
+    <div class="card">
+      <h2>Resultado</h2>
+      <div class="score" id="score"></div>
+      <div class="muted" id="scoreTxt"></div>
+      <div id="falladasBox"></div>
+      <div class="actions">
+        <button id="volverConfig">Cambiar opciones</button>
+        <div class="row"><button id="repetirFall">Repasar las falladas</button>
+        <button class="primary" id="repetir">Otra vuelta</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---------- utilidades ----------
+const $ = id => document.getElementById(id);
+const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9<>=%]/g, "");
+const mezclar = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mostrar = v => ["vCarga", "vConfig", "vPregunta", "vFin"].forEach(x => $(x).classList.toggle("hidden", x !== v));
+
+// Estadísticas por pregunta (quedan guardadas en este navegador)
+let stats = {};
+try { stats = JSON.parse(localStorage.getItem("practica_stats") || "{}"); } catch (e) { stats = {}; }
+const guardarStats = () => { try { localStorage.setItem("practica_stats", JSON.stringify(stats)); } catch (e) {} };
+
+// ---------- cargar json ----------
+let banco = [];
+
+function convertir(datos) {
+  // Acepta el banco.json nuevo y también el formato viejo
+  return datos.map((b, i) => {
+    const opciones = (b.opciones || []).map(o => typeof o === "string" ? o : o.texto);
+    const corr = new Set((b.correctas || []).map(norm));
+    const desc = new Set((b.descartadas || []).map(norm));
+    const fuentes = b.fuente_ok || {};
+    const opts = opciones.map(t => {
+      const n = norm(t);
+      return { texto: t, n, estado: corr.has(n) ? "ok" : desc.has(n) ? "mal" : "?", fuente: fuentes[n] };
+    });
+    const tema = b.tema || (b.cmid ? "cmid " + b.cmid : "Sin unidad");
+    const completa = b.completa !== undefined ? b.completa : opts.some(o => o.estado === "ok") && !opts.some(o => o.estado === "?");
+    const otrasFuentes = [...new Set(opts.filter(o => o.estado === "ok" && o.fuente && o.fuente !== "Moodle" && o.fuente !== "descarte").map(o => o.fuente))];
+    return {
+      id: norm(tema).slice(0, 12) + ":" + norm(b.enunciado).slice(0, 80) + ":" + opts.map(o => o.n).sort().join("|").slice(0, 60),
+      tema, enunciado: b.enunciado, imagenes: b.imagenes || [],
+      tipo: b.tipo, multiple: !!b.multiple || opts.filter(o => o.estado === "ok").length > 1,
+      opts, completa, otrasFuentes, notas: b.notas || [],
+      tieneRespuesta: opts.some(o => o.estado === "ok"),
+    };
+  }).filter(q => q.opts.length);
+}
+
+function leerArchivo(f) {
+  $("err").textContent = "";
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const datos = JSON.parse(r.result);
+      if (!Array.isArray(datos)) throw new Error("El json no es una lista de preguntas.");
+      banco = convertir(datos);
+      if (!banco.length) throw new Error("No encontré preguntas en el archivo.");
+      armarConfig();
+      mostrar("vConfig");
+    } catch (e) { $("err").textContent = "No pude leer el archivo: " + e.message; }
+  };
+  r.readAsText(f, "utf-8");
+}
+const drop = $("drop");
+drop.onclick = () => $("file").click();
+$("file").onchange = e => e.target.files[0] && leerArchivo(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && leerArchivo(e.dataTransfer.files[0]); };
+
+// ---------- configuración ----------
+function armarConfig() {
+  const temas = {};
+  banco.forEach(q => temas[q.tema] = (temas[q.tema] || 0) + 1);
+  $("temas").innerHTML = Object.keys(temas).sort().map(t =>
+    `<label><input type="checkbox" class="tema" value="${esc(t)}" checked> ${esc(t)} <span class="n">${temas[t]} preguntas</span></label>`).join("");
+  document.querySelectorAll(".tema, #oSinConf, #oFalladas").forEach(el => el.onchange = actualizarResumen);
+  actualizarResumen();
+}
+$("todos").onclick = () => { document.querySelectorAll(".tema").forEach(c => c.checked = true); actualizarResumen(); };
+$("ninguno").onclick = () => { document.querySelectorAll(".tema").forEach(c => c.checked = false); actualizarResumen(); };
+$("otroJson").onclick = () => { $("file").value = ""; mostrar("vCarga"); };
+
+function seleccion() {
+  const temas = new Set([...document.querySelectorAll(".tema:checked")].map(c => c.value));
+  let qs = banco.filter(q => temas.has(q.tema) && q.tieneRespuesta && ($("oSinConf").checked || q.completa));
+  if ($("oFalladas").checked) {
+    qs = qs.filter(q => (stats[q.id]?.mal || 0) > 0)
+      .sort((a, b) => (stats[b.id].mal / (stats[b.id].vistas || 1)) - (stats[a.id].mal / (stats[a.id].vistas || 1)));
+  }
+  return qs;
+}
+function actualizarResumen() {
+  const n = seleccion().length;
+  $("resumenSel").textContent = n ? `${n} preguntas disponibles` : ($("oFalladas").checked ? "Todavía no fallaste ninguna de estas 🎉" : "No hay preguntas con esa selección");
+  $("empezar").disabled = !n;
+}
+
+// ---------- sesión ----------
+let cola = [], idx = 0, bien = 0, respondidas = 0, falladas = [], actual = null, comprobada = false;
+
+function empezar(lista) {
+  let qs = lista || seleccion();
+  if (!lista && $("oMezclarQ").checked) qs = mezclar(qs);
+  if (lista && $("oMezclarQ").checked) qs = mezclar(qs);
+  const cant = +$("oCant").value;
+  if (!lista && cant) qs = qs.slice(0, cant);
+  cola = qs; idx = 0; bien = 0; respondidas = 0; falladas = [];
+  mostrar("vPregunta");
+  pintar();
+}
+$("empezar").onclick = () => empezar();
+
+function pintar() {
+  if (idx >= cola.length) return fin();
+  comprobada = false;
+  const q = cola[idx];
+  actual = { q, opts: $("oMezclarO").checked && q.tipo !== "truefalse" ? mezclar(q.opts) : q.opts.slice() };
+  $("pos").textContent = `Pregunta ${idx + 1} de ${cola.length}`;
+  $("marcador").textContent = respondidas ? `${bien}/${respondidas} bien` : "";
+  $("barra").style.width = (idx / cola.length * 100) + "%";
+  const st = stats[q.id];
+  $("tags").innerHTML = `<span class="tag">${esc(q.tema)}</span>` +
+    (!q.completa ? `<span class="tag warn">sin confirmar</span>` : "") +
+    (st?.mal ? `<span class="tag">fallada ${st.mal} de ${st.vistas}</span>` : "");
+  $("enunciado").textContent = q.enunciado;
+  $("consigna").textContent = q.multiple ? "Seleccioná una o más" : "Seleccioná una";
+  $("imgs").innerHTML = q.imagenes.map(src =>
+    `<div class="img"><img src="${esc(src)}" alt="Figura de la pregunta" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'muted',innerHTML:'No se pudo cargar la figura (hay que estar logueado en el campus). <a target=_blank href=&quot;${esc(src)}&quot;>Abrir figura</a>'}))"></div>`).join("");
+  const tipoInput = q.multiple ? "checkbox" : "radio";
+  $("opciones").className = "";
+  $("opciones").innerHTML = actual.opts.map((o, i) =>
+    `<label class="opt" data-i="${i}"><input type="${tipoInput}" name="op" value="${i}">
+      <span class="k">${q.tipo === "truefalse" ? "" : String.fromCharCode(97 + i) + "."}</span>
+      <span>${esc(o.texto)}</span><span class="mark"></span></label>`).join("");
+  $("opciones").querySelectorAll("input").forEach(inp => inp.onchange = () => { $("accion").disabled = !elegidas().length; });
+  $("veredicto").innerHTML = "";
+  $("accion").textContent = "Comprobar";
+  $("accion").disabled = true;
+  $("saltar").classList.remove("hidden");
+}
+const elegidas = () => [...$("opciones").querySelectorAll("input:checked")].map(i => +i.value);
+
+function comprobar() {
+  comprobada = true;
+  const q = actual.q, sel = new Set(elegidas());
+  let correcto = true, hayDudas = false;
+  $("opciones").classList.add("locked");
+  $("opciones").querySelectorAll(".opt").forEach(el => {
+    const i = +el.dataset.i, o = actual.opts[i], marcada = sel.has(i);
+    el.querySelector("input").disabled = true;
+    const mk = el.querySelector(".mark");
+    if (o.estado === "ok") {
+      if (marcada) { el.classList.add("ok"); mk.textContent = "✔"; }
+      else { el.classList.add("miss"); mk.textContent = "✔ faltó"; correcto = false; }
+    } else if (o.estado === "mal") {
+      if (marcada) { el.classList.add("bad"); mk.textContent = "✘"; correcto = false; }
+    } else {
+      el.classList.add("unk"); mk.textContent = "?"; hayDudas = true;
+      if (marcada) hayDudas = true;
+    }
+  });
+  respondidas++;
+  if (correcto) bien++; else falladas.push(q);
+  const s = stats[q.id] || (stats[q.id] = { vistas: 0, mal: 0 });
+  s.vistas++; if (!correcto) s.mal++; guardarStats();
+
+  let extra = "";
+  if (q.otrasFuentes.length) extra += `<div class="extra">Respuesta según: ${q.otrasFuentes.map(esc).join("; ")}</div>`;
+  q.notas.forEach(n => extra += `<div class="extra">${esc(n)}</div>`);
+  if (hayDudas) extra += `<div class="extra">Las opciones con “?” todavía no están confirmadas.</div>`;
+  const cls = correcto ? (hayDudas ? "unk" : "ok") : "bad";
+  const txt = correcto ? "¡Correcto!" : (q.multiple ? "Incorrecto: revisá las marcadas y las que faltaron." : "Incorrecto.");
+  $("veredicto").innerHTML = `<div class="verdict ${cls}">${txt}${extra}</div>`;
+  $("marcador").textContent = `${bien}/${respondidas} bien`;
+  $("accion").textContent = idx + 1 < cola.length ? "Siguiente" : "Ver resultado";
+  $("accion").disabled = false;
+  $("saltar").classList.add("hidden");
+}
+$("accion").onclick = () => comprobada ? (idx++, pintar()) : comprobar();
+$("saltar").onclick = () => { idx++; pintar(); };
+$("salir").onclick = fin;
+
+document.addEventListener("keydown", e => {
+  if ($("vPregunta").classList.contains("hidden")) return;
+  if (e.key === "Enter") { e.preventDefault(); if (!$("accion").disabled) $("accion").click(); return; }
+  const n = parseInt(e.key, 10);
+  if (!comprobada && n >= 1 && n <= 9) {
+    const inp = $("opciones").querySelectorAll("input")[n - 1];
+    if (inp) { inp.checked = inp.type === "checkbox" ? !inp.checked : true; inp.onchange(); }
+  }
+});
+
+// ---------- fin ----------
+function fin() {
+  mostrar("vFin");
+  const pct = respondidas ? Math.round(bien / respondidas * 100) : 0;
+  $("score").textContent = respondidas ? pct + "%" : "—";
+  $("scoreTxt").textContent = `${bien} bien de ${respondidas} respondidas` + (cola.length > respondidas ? ` (${cola.length - respondidas} sin responder)` : "");
+  $("falladasBox").innerHTML = falladas.length
+    ? `<h2 style="margin-top:18px">Para repasar</h2><ol class="lista">${falladas.map(q =>
+        `<li>${esc(q.enunciado)}<br><span class="muted">→ ${q.opts.filter(o => o.estado === "ok").map(o => esc(o.texto)).join(" · ")}</span></li>`).join("")}</ol>`
+    : "";
+  $("repetirFall").disabled = !falladas.length;
+}
+$("repetir").onclick = () => empezar();
+$("repetirFall").onclick = () => empezar(falladas.slice());
+$("volverConfig").onclick = () => { actualizarResumen(); mostrar("vConfig"); };
+</script>
+</body>
+</html>
