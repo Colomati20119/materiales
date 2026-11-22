@@ -120,7 +120,10 @@
         <div class="muted" style="font-size:14px;margin-bottom:6px">Calificación:</div>
         <label><input type="radio" name="calif" value="normal" checked> Normal: cada bien suma 1</label>
         <label><input type="radio" name="calif" value="resta"> Con descuento: cada mal anula una bien (las no contestadas no suman ni restan)</label>
-        <div class="muted" style="font-size:13px;margin-top:6px">El examen usa solo preguntas confirmadas, repartidas entre las unidades elegidas, y no te muestra las respuestas hasta que lo entregás.</div>
+        <div class="muted" style="font-size:14px;margin:12px 0 6px">Corrección:</div>
+        <label><input type="radio" name="correccion" value="final" checked> Al final (como en Moodle)</label>
+        <label><input type="radio" name="correccion" value="instante"> Al instante (confirmás cada respuesta y te dice si está bien)</label>
+        <div class="muted" style="font-size:13px;margin-top:6px">El examen usa solo preguntas confirmadas, repartidas entre las unidades elegidas, elegidas.</div>
       </div>
     </div>
     <div class="card opts" id="cfgPractica">
@@ -174,13 +177,15 @@
       <div class="hint" id="exCons"></div>
       <div id="exImgs"></div>
       <div id="exOpts"></div>
+      <div id="exVeredicto"></div>
       <div class="actions">
         <div class="row"><button id="exAnt">← Anterior</button><button id="exLimpiar">Borrar respuesta</button></div>
         <div class="row"><button id="exSig">Siguiente →</button>
+        <button class="primary" id="exConfirmar">Confirmar</button>
         <button class="primary" id="exEntregar">Entregar</button></div>
       </div>
     </div>
-    <div class="kbd">Teclas: 1–9 elegir · ← → moverse entre preguntas</div>
+    <div class="kbd" id="exKbd">Teclas: 1–9 elegir · ← → moverse entre preguntas</div>
   </section>
 
   <!-- 4b. Resultado examen -->
@@ -448,6 +453,8 @@ function empezarExamen() {
     resp: sel.map(() => new Set()),
     idx: 0,
     calif: document.querySelector("input[name=calif]:checked").value,
+    instante: document.querySelector("input[name=correccion]:checked").value === "instante",
+    bloq: sel.map(() => null),   // en modo "al instante": "ok" / "bad" cuando se confirmó
     fin: Date.now() + EX_MIN * 60 * 1000,
     timer: null, entregado: false,
   };
@@ -469,29 +476,56 @@ function tick() {
 function pintarEx() {
   const { q, opts } = ex.qs[ex.idx], r = ex.resp[ex.idx];
   const contestadas = ex.resp.filter(s => s.size).length;
-  $("exPos").textContent = `Pregunta ${ex.idx + 1} de ${ex.qs.length} · ${contestadas} contestadas`;
+  $("exPos").textContent = textoPos();
   $("exNav").innerHTML = ex.qs.map((_, i) =>
-    `<button class="${ex.resp[i].size ? "resp" : ""} ${i === ex.idx ? "act" : ""}" data-i="${i}">${i + 1}</button>`).join("");
+    `<button class="${claseNav(i)} ${i === ex.idx ? "act" : ""}" data-i="${i}">${i + 1}</button>`).join("");
   $("exNav").querySelectorAll("button").forEach(b => b.onclick = () => { ex.idx = +b.dataset.i; pintarEx(); });
   $("exTags").innerHTML = `<span class="tag">${esc(q.tema)}</span>`;
   $("exEnun").textContent = q.enunciado;
   $("exCons").textContent = q.multiple ? "Seleccioná una o más" : "Seleccioná una";
   $("exImgs").innerHTML = htmlImgs(q);
   const tipo = q.multiple ? "checkbox" : "radio";
-  $("exOpts").innerHTML = opts.map((o, i) =>
-    `<label class="opt"><input type="${tipo}" name="exop" value="${i}" ${r.has(i) ? "checked" : ""}>
+  const b = ex.bloq[ex.idx];
+  $("exOpts").className = b ? "locked" : "";
+  $("exOpts").innerHTML = opts.map((o, i) => {
+    let cls = "", mk = "";
+    if (b) {
+      if (o.estado === "ok") { cls = r.has(i) ? "ok" : "miss"; mk = r.has(i) ? "✔" : (q.multiple ? "✔ faltó" : "✔ correcta"); }
+      else if (r.has(i)) { cls = "bad"; mk = "✘"; }
+    }
+    return `<label class="opt ${cls}"><input type="${tipo}" name="exop" value="${i}" ${r.has(i) ? "checked" : ""} ${b ? "disabled" : ""}>
       <span class="k">${q.tipo === "truefalse" ? "" : String.fromCharCode(97 + i) + "."}</span>
-      <span>${esc(o.texto)}</span></label>`).join("");
+      <span>${esc(o.texto)}</span><span class="mark">${mk}</span></label>`;
+  }).join("");
+  $("exVeredicto").innerHTML = b ? `<div class="verdict ${b}">${b === "ok" ? "¡Correcto!" : "Incorrecto."}${
+    q.otrasFuentes.length ? `<div class="extra">Respuesta según: ${q.otrasFuentes.map(esc).join("; ")}</div>` : ""}${
+    q.notas.map(n => `<div class="extra">${esc(n)}</div>`).join("")}</div>` : "";
+  $("exConfirmar").classList.toggle("hidden", !ex.instante || !!b);
+  $("exConfirmar").disabled = !r.size;
+  $("exLimpiar").classList.toggle("hidden", !!b);
+  $("exKbd").textContent = ex.instante
+    ? "Teclas: 1–9 elegir · Enter confirmar · ← → moverse entre preguntas"
+    : "Teclas: 1–9 elegir · ← → moverse entre preguntas";
   $("exOpts").querySelectorAll("input").forEach(inp => inp.onchange = () => {
     ex.resp[ex.idx] = new Set([...$("exOpts").querySelectorAll("input:checked")].map(x => +x.value));
+    $("exConfirmar").disabled = !ex.resp[ex.idx].size;
     actualizarNav();
   });
   $("exAnt").disabled = ex.idx === 0;
   $("exSig").disabled = ex.idx === ex.qs.length - 1;
 }
+function textoPos() {
+  let t = `Pregunta ${ex.idx + 1} de ${ex.qs.length} · ${ex.resp.filter(s => s.size).length} contestadas`;
+  if (ex.instante) t += ` · ${ex.bloq.filter(x => x === "ok").length} bien, ${ex.bloq.filter(x => x === "bad").length} mal`;
+  return t;
+}
+function claseNav(i) {
+  if (ex.bloq[i]) return "r-" + ex.bloq[i];
+  return ex.resp[i].size ? "resp" : "";
+}
 function actualizarNav() {
-  $("exNav").querySelectorAll("button").forEach((b, i) => b.classList.toggle("resp", ex.resp[i].size > 0));
-  $("exPos").textContent = `Pregunta ${ex.idx + 1} de ${ex.qs.length} · ${ex.resp.filter(s => s.size).length} contestadas`;
+  $("exNav").querySelectorAll("button").forEach((b, i) => { b.classList.remove("resp", "r-ok", "r-bad"); const c = claseNav(i); if (c) b.classList.add(c); });
+  $("exPos").textContent = textoPos();
 }
 function htmlImgs(q) {
   return q.imagenes.map(src =>
@@ -499,7 +533,13 @@ function htmlImgs(q) {
 }
 $("exAnt").onclick = () => { if (ex.idx > 0) { ex.idx--; pintarEx(); } };
 $("exSig").onclick = () => { if (ex.idx < ex.qs.length - 1) { ex.idx++; pintarEx(); } };
-$("exLimpiar").onclick = () => { ex.resp[ex.idx] = new Set(); pintarEx(); };
+$("exLimpiar").onclick = () => { if (!ex.bloq[ex.idx]) { ex.resp[ex.idx] = new Set(); pintarEx(); } };
+$("exConfirmar").onclick = () => {
+  if (!ex.instante || ex.bloq[ex.idx] || !ex.resp[ex.idx].size) return;
+  ex.bloq[ex.idx] = corregir(ex.qs[ex.idx], ex.resp[ex.idx]);
+  const ok = ex.bloq.filter(x => x === "ok").length, mal = ex.bloq.filter(x => x === "bad").length;
+  pintarEx();
+};
 $("exEntregar").onclick = () => {
   const faltan = ex.resp.filter(s => !s.size).length;
   if (faltan && !confirm(`Te quedan ${faltan} sin contestar. ¿Entregar igual?`)) return;
@@ -566,8 +606,13 @@ document.addEventListener("keydown", e => {
   if ($("vExamen").classList.contains("hidden")) return;
   if (e.key === "ArrowRight") return $("exSig").click();
   if (e.key === "ArrowLeft") return $("exAnt").click();
+  if (e.key === "Enter" && ex.instante) {
+    e.preventDefault();
+    if (!ex.bloq[ex.idx]) return $("exConfirmar").click();
+    return $("exSig").click();
+  }
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= 9) {
+  if (n >= 1 && n <= 9 && !ex.bloq[ex.idx]) {
     const inp = $("exOpts").querySelectorAll("input")[n - 1];
     if (inp) { inp.checked = inp.type === "checkbox" ? !inp.checked : true; inp.onchange(); }
   }
