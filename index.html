@@ -68,6 +68,8 @@
   .muted{color:var(--muted)}
   .kbd{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
   .hidden{display:none}
+  .expl{font-weight:400;font-size:15px;color:var(--ink);margin-top:10px;padding-top:10px;border-top:1px solid rgba(127,127,127,.25);line-height:1.55}
+  .expl-caja{background:var(--bg);border:none;border-radius:10px;padding:10px 12px;margin-top:12px}
   .reloj{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;color:var(--ink)}
   .reloj.poco{color:var(--bad)}
   .nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
@@ -253,6 +255,7 @@ function convertir(datos) {
       tema, enunciado: b.enunciado, imagenes: b.imagenes || [],
       tipo: b.tipo, multiple: !!b.multiple || opts.filter(o => o.estado === "ok").length > 1,
       opts, completa, otrasFuentes, notas: b.notas || [],
+      explicacion: (b.explicacion || "").trim(),
       tieneRespuesta: opts.some(o => o.estado === "ok"),
     };
   }).filter(q => q.opts.length);
@@ -390,6 +393,7 @@ function comprobar() {
   let extra = "";
   if (q.otrasFuentes.length) extra += `<div class="extra">Respuesta según: ${q.otrasFuentes.map(esc).join("; ")}</div>`;
   q.notas.forEach(n => extra += `<div class="extra">${esc(n)}</div>`);
+  extra += htmlExpl(q);
   if (hayDudas) extra += `<div class="extra">Las opciones con “?” todavía no están confirmadas.</div>`;
   const cls = correcto ? (hayDudas ? "unk" : "ok") : "bad";
   const txt = correcto ? "¡Correcto!" : (q.multiple ? "Incorrecto: revisá las marcadas y las que faltaron." : "Incorrecto.");
@@ -499,7 +503,7 @@ function pintarEx() {
   }).join("");
   $("exVeredicto").innerHTML = b ? `<div class="verdict ${b}">${b === "ok" ? "¡Correcto!" : "Incorrecto."}${
     q.otrasFuentes.length ? `<div class="extra">Respuesta según: ${q.otrasFuentes.map(esc).join("; ")}</div>` : ""}${
-    q.notas.map(n => `<div class="extra">${esc(n)}</div>`).join("")}</div>` : "";
+    q.notas.map(n => `<div class="extra">${esc(n)}</div>`).join("")}${htmlExpl(q)}</div>` : "";
   $("exConfirmar").classList.toggle("hidden", !ex.instante || !!b);
   $("exConfirmar").disabled = !r.size;
   $("exLimpiar").classList.toggle("hidden", !!b);
@@ -526,6 +530,11 @@ function claseNav(i) {
 function actualizarNav() {
   $("exNav").querySelectorAll("button").forEach((b, i) => { b.classList.remove("resp", "r-ok", "r-bad"); const c = claseNav(i); if (c) b.classList.add(c); });
   $("exPos").textContent = textoPos();
+}
+function htmlExpl(q, enCaja) {
+  if (!q.explicacion) return "";
+  const t = esc(q.explicacion).replace(/\n/g, "<br>");
+  return enCaja ? `<div class="expl expl-caja"><b>¿Por qué?</b> ${t}</div>` : `<div class="expl"><b>¿Por qué?</b> ${t}</div>`;
 }
 function htmlImgs(q) {
   return q.imagenes.map(src =>
@@ -594,7 +603,7 @@ function entregar(porTiempo) {
     const est = { ok: ["ok", "✔ Bien"], bad: ["bad", "✘ Mal"], sr: ["sr", "— Sin contestar"] }[r];
     const fuente = it.q.otrasFuentes.length ? `<div class="hint">Respuesta según: ${it.q.otrasFuentes.map(esc).join("; ")}</div>` : "";
     return `<div class="card rev" id="rev${i}"><div class="estado ${est[0]}">${i + 1}. ${est[1]} <span class="tag" style="margin-left:6px">${esc(it.q.tema)}</span></div>
-      <h3>${esc(it.q.enunciado)}</h3>${htmlImgs(it.q)}${opts}${fuente}</div>`;
+      <h3>${esc(it.q.enunciado)}</h3>${htmlImgs(it.q)}${opts}${fuente}${htmlExpl(it.q, true)}</div>`;
   }).join("");
   mostrar("vFinExamen");
   window.scrollTo(0, 0);
