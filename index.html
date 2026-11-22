@@ -68,6 +68,20 @@
   .muted{color:var(--muted)}
   .kbd{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
   .hidden{display:none}
+  .reloj{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;color:var(--ink)}
+  .reloj.poco{color:var(--bad)}
+  .nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .nav button{width:38px;height:34px;padding:0;font-size:14px}
+  .nav button.resp{background:var(--acc);border-color:var(--acc);color:#fff}
+  .nav button.act{outline:2px solid var(--ink);outline-offset:1px}
+  .nav button.r-ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+  .nav button.r-bad{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+  .stats div{background:var(--bg);border-radius:10px;padding:10px;text-align:center}
+  .stats b{display:block;font-size:24px}
+  .rev h3{font-size:16px;margin:0 0 8px;font-weight:500}
+  .rev .estado{font-size:13px;font-weight:700;margin-bottom:6px}
+  .rev .estado.ok{color:var(--ok)} .rev .estado.bad{color:var(--bad)} .rev .estado.sr{color:var(--muted)}
   .err{color:var(--bad);margin-top:10px}
 </style>
 </head>
@@ -97,6 +111,19 @@
       </div>
     </div>
     <div class="card opts">
+      <h2>Modo</h2>
+      <div class="grid2">
+        <label><input type="radio" name="modo" value="practica" checked> Práctica (te corrige al instante)</label>
+        <label><input type="radio" name="modo" value="examen"> Examen (20 preguntas · 10 min)</label>
+      </div>
+      <div id="cfgExamen" class="hidden" style="margin-top:12px">
+        <div class="muted" style="font-size:14px;margin-bottom:6px">Calificación:</div>
+        <label><input type="radio" name="calif" value="normal" checked> Normal: cada bien suma 1</label>
+        <label><input type="radio" name="calif" value="resta"> Con descuento: cada mal anula una bien (las no contestadas no suman ni restan)</label>
+        <div class="muted" style="font-size:13px;margin-top:6px">El examen usa solo preguntas confirmadas, repartidas entre las unidades elegidas, y no te muestra las respuestas hasta que lo entregás.</div>
+      </div>
+    </div>
+    <div class="card opts" id="cfgPractica">
       <h2>Opciones</h2>
       <div class="grid2">
         <label><input type="checkbox" id="oMezclarQ" checked> Mezclar preguntas</label>
@@ -137,6 +164,39 @@
     <div class="kbd">Teclas: 1–9 elegir · Enter comprobar / siguiente</div>
   </section>
 
+  <!-- 3b. Examen -->
+  <section id="vExamen" class="hidden">
+    <div class="top"><span id="exPos"></span><span id="reloj" class="reloj"></span></div>
+    <div class="nav" id="exNav"></div>
+    <div class="card">
+      <div id="exTags"></div>
+      <div class="q" id="exEnun"></div>
+      <div class="hint" id="exCons"></div>
+      <div id="exImgs"></div>
+      <div id="exOpts"></div>
+      <div class="actions">
+        <div class="row"><button id="exAnt">← Anterior</button><button id="exLimpiar">Borrar respuesta</button></div>
+        <div class="row"><button id="exSig">Siguiente →</button>
+        <button class="primary" id="exEntregar">Entregar</button></div>
+      </div>
+    </div>
+    <div class="kbd">Teclas: 1–9 elegir · ← → moverse entre preguntas</div>
+  </section>
+
+  <!-- 4b. Resultado examen -->
+  <section id="vFinExamen" class="hidden">
+    <div class="card">
+      <h2>Resultado del examen</h2>
+      <div class="score" id="exNota"></div>
+      <div id="exDetalle"></div>
+      <div class="actions">
+        <button id="exConfig">Cambiar opciones</button>
+        <button class="primary" id="exOtro">Otro examen</button>
+      </div>
+    </div>
+    <div id="exRevision"></div>
+  </section>
+
   <!-- 4. Resultado -->
   <section id="vFin" class="hidden">
     <div class="card">
@@ -159,7 +219,7 @@ const $ = id => document.getElementById(id);
 const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9<>=%]/g, "");
 const mezclar = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const mostrar = v => ["vCarga", "vConfig", "vPregunta", "vFin"].forEach(x => $(x).classList.toggle("hidden", x !== v));
+const mostrar = v => ["vCarga", "vConfig", "vPregunta", "vFin", "vExamen", "vFinExamen"].forEach(x => $(x).classList.toggle("hidden", x !== v));
 
 // Estadísticas por pregunta (quedan guardadas en este navegador)
 let stats = {};
@@ -238,6 +298,16 @@ function seleccion() {
   return qs;
 }
 function actualizarResumen() {
+  const examen = modoActual() === "examen";
+  $("cfgExamen").classList.toggle("hidden", !examen);
+  $("cfgPractica").classList.toggle("hidden", examen);
+  if (examen) {
+    const n = poolExamen().reduce((s, p) => s + p.length, 0);
+    $("resumenSel").textContent = n >= EX_N ? `${n} preguntas confirmadas para sortear`
+      : n ? `Solo hay ${n} preguntas confirmadas: el examen tendrá ${n}` : "No hay preguntas confirmadas con esa selección";
+    $("empezar").disabled = !n;
+    return;
+  }
   const n = seleccion().length;
   $("resumenSel").textContent = n ? `${n} preguntas disponibles` : ($("oFalladas").checked ? "Todavía no fallaste ninguna de estas 🎉" : "No hay preguntas con esa selección");
   $("empezar").disabled = !n;
@@ -256,7 +326,7 @@ function empezar(lista) {
   mostrar("vPregunta");
   pintar();
 }
-$("empezar").onclick = () => empezar();
+$("empezar").onclick = () => modoActual() === "examen" ? empezarExamen() : empezar();
 
 function pintar() {
   if (idx >= cola.length) return fin();
@@ -353,6 +423,155 @@ function fin() {
 $("repetir").onclick = () => empezar();
 $("repetirFall").onclick = () => empezar(falladas.slice());
 $("volverConfig").onclick = () => { actualizarResumen(); mostrar("vConfig"); };
+
+// ================= MODO EXAMEN =================
+const EX_N = 20, EX_MIN = 10;
+const modoActual = () => document.querySelector("input[name=modo]:checked").value;
+document.querySelectorAll("input[name=modo]").forEach(r => r.onchange = actualizarResumen);
+
+function poolExamen() {
+  const temas = [...document.querySelectorAll(".tema:checked")].map(c => c.value);
+  return temas.map(t => banco.filter(q => q.tema === t && q.completa && q.tieneRespuesta));
+}
+
+let ex = null;
+
+function empezarExamen() {
+  // Reparto equilibrado: se toma una pregunta de cada unidad por turno (en orden al azar)
+  const pools = poolExamen().map(mezclar).filter(p => p.length);
+  const sel = [];
+  while (sel.length < EX_N && pools.some(p => p.length)) {
+    for (const p of mezclar(pools)) if (p.length && sel.length < EX_N) sel.push(p.pop());
+  }
+  ex = {
+    qs: mezclar(sel).map(q => ({ q, opts: q.tipo === "truefalse" ? q.opts.slice() : mezclar(q.opts) })),
+    resp: sel.map(() => new Set()),
+    idx: 0,
+    calif: document.querySelector("input[name=calif]:checked").value,
+    fin: Date.now() + EX_MIN * 60 * 1000,
+    timer: null, entregado: false,
+  };
+  ex.timer = setInterval(tick, 250);
+  tick();
+  mostrar("vExamen");
+  pintarEx();
+}
+
+function tick() {
+  if (!ex || ex.entregado) return;
+  const ms = Math.max(0, ex.fin - Date.now());
+  const s = Math.ceil(ms / 1000);
+  $("reloj").textContent = `⏱ ${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  $("reloj").classList.toggle("poco", s <= 60);
+  if (ms <= 0) entregar(true);
+}
+
+function pintarEx() {
+  const { q, opts } = ex.qs[ex.idx], r = ex.resp[ex.idx];
+  const contestadas = ex.resp.filter(s => s.size).length;
+  $("exPos").textContent = `Pregunta ${ex.idx + 1} de ${ex.qs.length} · ${contestadas} contestadas`;
+  $("exNav").innerHTML = ex.qs.map((_, i) =>
+    `<button class="${ex.resp[i].size ? "resp" : ""} ${i === ex.idx ? "act" : ""}" data-i="${i}">${i + 1}</button>`).join("");
+  $("exNav").querySelectorAll("button").forEach(b => b.onclick = () => { ex.idx = +b.dataset.i; pintarEx(); });
+  $("exTags").innerHTML = `<span class="tag">${esc(q.tema)}</span>`;
+  $("exEnun").textContent = q.enunciado;
+  $("exCons").textContent = q.multiple ? "Seleccioná una o más" : "Seleccioná una";
+  $("exImgs").innerHTML = htmlImgs(q);
+  const tipo = q.multiple ? "checkbox" : "radio";
+  $("exOpts").innerHTML = opts.map((o, i) =>
+    `<label class="opt"><input type="${tipo}" name="exop" value="${i}" ${r.has(i) ? "checked" : ""}>
+      <span class="k">${q.tipo === "truefalse" ? "" : String.fromCharCode(97 + i) + "."}</span>
+      <span>${esc(o.texto)}</span></label>`).join("");
+  $("exOpts").querySelectorAll("input").forEach(inp => inp.onchange = () => {
+    ex.resp[ex.idx] = new Set([...$("exOpts").querySelectorAll("input:checked")].map(x => +x.value));
+    actualizarNav();
+  });
+  $("exAnt").disabled = ex.idx === 0;
+  $("exSig").disabled = ex.idx === ex.qs.length - 1;
+}
+function actualizarNav() {
+  $("exNav").querySelectorAll("button").forEach((b, i) => b.classList.toggle("resp", ex.resp[i].size > 0));
+  $("exPos").textContent = `Pregunta ${ex.idx + 1} de ${ex.qs.length} · ${ex.resp.filter(s => s.size).length} contestadas`;
+}
+function htmlImgs(q) {
+  return q.imagenes.map(src =>
+    `<div class="img"><img src="${esc(src)}" alt="Figura de la pregunta" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'muted',innerHTML:'No se pudo cargar la figura (hay que estar logueado en el campus). <a target=_blank href=&quot;${esc(src)}&quot;>Abrir figura</a>'}))"></div>`).join("");
+}
+$("exAnt").onclick = () => { if (ex.idx > 0) { ex.idx--; pintarEx(); } };
+$("exSig").onclick = () => { if (ex.idx < ex.qs.length - 1) { ex.idx++; pintarEx(); } };
+$("exLimpiar").onclick = () => { ex.resp[ex.idx] = new Set(); pintarEx(); };
+$("exEntregar").onclick = () => {
+  const faltan = ex.resp.filter(s => !s.size).length;
+  if (faltan && !confirm(`Te quedan ${faltan} sin contestar. ¿Entregar igual?`)) return;
+  entregar(false);
+};
+
+function corregir(item, resp) {
+  if (!resp.size) return "sr";
+  const ok = new Set(item.opts.map((o, i) => o.estado === "ok" ? i : -1).filter(i => i >= 0));
+  return ok.size === resp.size && [...resp].every(i => ok.has(i)) ? "ok" : "bad";
+}
+
+function entregar(porTiempo) {
+  if (ex.entregado) return;
+  ex.entregado = true;
+  clearInterval(ex.timer);
+  const res = ex.qs.map((it, i) => corregir(it, ex.resp[i]));
+  const bien = res.filter(r => r === "ok").length, mal = res.filter(r => r === "bad").length,
+        sr = res.filter(r => r === "sr").length, total = ex.qs.length;
+  // Estadísticas (las no contestadas no cuentan como vistas)
+  ex.qs.forEach((it, i) => {
+    if (res[i] === "sr") return;
+    const s = stats[it.q.id] || (stats[it.q.id] = { vistas: 0, mal: 0 });
+    s.vistas++; if (res[i] === "bad") s.mal++;
+  });
+  guardarStats();
+
+  const ptsNormal = bien, ptsResta = Math.max(0, bien - mal);
+  const pts = ex.calif === "resta" ? ptsResta : ptsNormal;
+  const nota = v => (v / total * 10).toFixed(2).replace(".", ",");
+  const usado = (Date.now() - (ex.fin - EX_MIN * 60000)) / 1000;
+  const dur = porTiempo ? "Se terminó el tiempo" : `Tiempo usado: ${Math.floor(usado / 60)} min ${Math.round(usado % 60)} s`;
+
+  $("exNota").textContent = `${nota(pts)} / 10`;
+  $("exDetalle").innerHTML = `
+    <div class="muted">${ex.calif === "resta" ? "Calificación con descuento (cada mal anula una bien)" : "Calificación normal"} · ${dur}</div>
+    <div class="stats"><div><b style="color:var(--ok)">${bien}</b>bien</div><div><b style="color:var(--bad)">${mal}</b>mal</div><div><b>${sr}</b>sin contestar</div></div>
+    <div class="muted" style="font-size:14px">
+      Puntaje: ${ex.calif === "resta" ? `${bien} − ${mal} = ${pts}` : pts} de ${total} ·
+      con el otro método te daría ${nota(ex.calif === "resta" ? ptsNormal : ptsResta)}
+    </div>`;
+
+  $("exRevision").innerHTML = ex.qs.map((it, i) => {
+    const r = res[i], resp = ex.resp[i];
+    const opts = it.opts.map((o, j) => {
+      const m = resp.has(j);
+      let cls = "", mk = "";
+      if (o.estado === "ok") { cls = m ? "ok" : "miss"; mk = m ? "✔" : "✔ correcta"; }
+      else if (m) { cls = "bad"; mk = "✘ tu respuesta"; }
+      return `<div class="opt ${cls}"><span class="k">${it.q.tipo === "truefalse" ? "" : String.fromCharCode(97 + j) + "."}</span><span>${esc(o.texto)}</span><span class="mark">${mk}</span></div>`;
+    }).join("");
+    const est = { ok: ["ok", "✔ Bien"], bad: ["bad", "✘ Mal"], sr: ["sr", "— Sin contestar"] }[r];
+    const fuente = it.q.otrasFuentes.length ? `<div class="hint">Respuesta según: ${it.q.otrasFuentes.map(esc).join("; ")}</div>` : "";
+    return `<div class="card rev" id="rev${i}"><div class="estado ${est[0]}">${i + 1}. ${est[1]} <span class="tag" style="margin-left:6px">${esc(it.q.tema)}</span></div>
+      <h3>${esc(it.q.enunciado)}</h3>${htmlImgs(it.q)}${opts}${fuente}</div>`;
+  }).join("");
+  mostrar("vFinExamen");
+  window.scrollTo(0, 0);
+}
+$("exOtro").onclick = empezarExamen;
+$("exConfig").onclick = () => { actualizarResumen(); mostrar("vConfig"); };
+
+document.addEventListener("keydown", e => {
+  if ($("vExamen").classList.contains("hidden")) return;
+  if (e.key === "ArrowRight") return $("exSig").click();
+  if (e.key === "ArrowLeft") return $("exAnt").click();
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 9) {
+    const inp = $("exOpts").querySelectorAll("input")[n - 1];
+    if (inp) { inp.checked = inp.type === "checkbox" ? !inp.checked : true; inp.onchange(); }
+  }
+});
 </script>
 </body>
 </html>
